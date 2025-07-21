@@ -1,7 +1,7 @@
 [package]
 name = "live-streamer"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 actix = "0.13"
@@ -24,7 +24,7 @@ actix-ws = "0.3"
 awc = "3.2"
 
 chrono = { version = "0.4.30", features = ["serde"] }
-derive_more = "2.0.1"
+derive_more = { version = "2.0.1", features = ["full"] }
 dotenvy = "0.15"
 env_logger = "0.11"
 eyre = { version = "0.6", default-features = false, features = ["auto-install", "track-caller"] }
