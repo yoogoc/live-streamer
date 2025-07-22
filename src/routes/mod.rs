@@ -1,8 +1,9 @@
+use crate::actor::*;
+use crate::websocket::*;
+use actix::Addr;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use actix_ws;
 use futures_util::StreamExt as _;
-use crate::websocket::*;
-use actix::Addr;
 use log::{info, warn};
 use uuid::Uuid;
 
@@ -11,7 +12,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/api/v1")
             .route("/health", web::get().to(health_check))
             .route("/ws/{user_id}", web::get().to(websocket_handler))
-            .route("/digital-human/info", web::get().to(get_digital_human_info))
+            .route("/digital-human/info", web::get().to(get_digital_human_info)),
     );
 }
 
@@ -37,7 +38,13 @@ async fn websocket_handler(
     let session_id = Uuid::new_v4();
     let ws_manager_addr = ws_manager.get_ref().clone();
 
-    actix_web::rt::spawn(handle_websocket_session(session, stream, session_id, user_id, ws_manager_addr));
+    actix_web::rt::spawn(handle_websocket_session(
+        session,
+        stream,
+        session_id,
+        user_id,
+        ws_manager_addr,
+    ));
 
     Ok(response)
 }
@@ -50,7 +57,10 @@ async fn handle_websocket_session(
     ws_manager: Addr<WebSocketManager>,
 ) {
     // Send connection event
-    ws_manager.do_send(HandleUserConnect { session_id, user_id: user_id.clone() });
+    ws_manager.do_send(HandleUserConnect {
+        session_id,
+        user_id: user_id.clone(),
+    });
 
     while let Some(msg) = stream.next().await {
         match msg {
@@ -62,36 +72,36 @@ async fn handle_websocket_session(
                     user_id: user_id.clone(),
                     text: text.to_string(),
                 });
-                
+
                 // Echo back for now
                 if let Err(e) = session.text(format!("Echo: {}", text.to_string())).await {
                     warn!("Failed to send echo: {}", e);
                     break;
                 }
-            },
+            }
             Ok(actix_ws::Message::Binary(bin)) => {
                 info!("Received binary data: {} bytes", bin.len());
                 // Handle binary message (audio)
-            },
+            }
             Ok(actix_ws::Message::Ping(bytes)) => {
                 if let Err(e) = session.pong(&bytes).await {
                     warn!("Failed to send pong: {}", e);
                     break;
                 }
-            },
+            }
             Ok(actix_ws::Message::Pong(_)) => {
                 // Pong received
-            },
+            }
             Ok(actix_ws::Message::Close(reason)) => {
                 info!("WebSocket closed: {:?}", reason);
                 break;
-            },
+            }
             Ok(actix_ws::Message::Continuation(_)) => {
                 // Handle continuation frames
-            },
+            }
             Ok(actix_ws::Message::Nop) => {
                 // Handle nop frames
-            },
+            }
             Err(e) => {
                 warn!("WebSocket error: {}", e);
                 break;
@@ -100,7 +110,10 @@ async fn handle_websocket_session(
     }
 
     // Send disconnect event
-    ws_manager.do_send(HandleUserDisconnect { session_id, user_id });
+    ws_manager.do_send(HandleUserDisconnect {
+        session_id,
+        user_id,
+    });
     info!("WebSocket session ended");
 }
 

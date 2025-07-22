@@ -1,35 +1,35 @@
 use actix::prelude::*;
-use actix_web::{web, App, HttpServer, middleware::Logger};
 use actix_cors::Cors;
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use env_logger::Env;
 use eyre::Result;
 
-mod events;
-mod event_bus;
 mod actor;
-mod websocket;
+mod event_bus;
+mod events;
 mod llm;
 mod routes;
+mod websocket;
 
-use event_bus::EventBus;
 use actor::DigitalHumanActor;
+use event_bus::EventBus;
 use websocket::WebSocketManager;
 
 #[actix_web::main]
 async fn main() -> Result<()> {
     // Initialize logging
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    
+
     log::info!("Starting Digital Human Service...");
 
     // Create and start the event bus
     let event_bus = EventBus::new().start();
     log::info!("EventBus started");
-    
+
     // Create and start the WebSocket manager
     let ws_manager = WebSocketManager::new(event_bus.clone()).start();
     log::info!("WebSocketManager started");
-    
+
     // Create and start digital human actors
     let digital_human = DigitalHumanActor::new(
         "Maya".to_string(),
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             .wrap(Logger::default())
             .configure(routes::configure_routes)
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await?;
 
@@ -68,14 +68,9 @@ mod tests {
 
     #[actix_web::test]
     async fn test_health_check() {
-        let app = test::init_service(
-            App::new()
-                .configure(routes::configure_routes)
-        ).await;
+        let app = test::init_service(App::new().configure(routes::configure_routes)).await;
 
-        let req = test::TestRequest::get()
-            .uri("/api/v1/health")
-            .to_request();
+        let req = test::TestRequest::get().uri("/api/v1/health").to_request();
 
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
@@ -83,10 +78,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_digital_human_info() {
-        let app = test::init_service(
-            App::new()
-                .configure(routes::configure_routes)
-        ).await;
+        let app = test::init_service(App::new().configure(routes::configure_routes)).await;
 
         let req = test::TestRequest::get()
             .uri("/api/v1/digital-human/info")
