@@ -12,7 +12,7 @@ mod routes;
 mod websocket;
 
 use actor::DigitalHumanActor;
-use event_bus::EventBus;
+use event_bus::{EventBus, RegisterDigitalHuman, RegisterWebSocketManager};
 use websocket::WebSocketManager;
 
 #[actix_web::main]
@@ -37,6 +37,17 @@ async fn main() -> Result<()> {
         event_bus.clone()
     ).start();
     log::info!("DigitalHumanActor 'Maya' started");
+
+    // Register actors with EventBus
+    event_bus.do_send(RegisterDigitalHuman {
+        addr: digital_human.clone(),
+    });
+    
+    event_bus.do_send(RegisterWebSocketManager {
+        addr: ws_manager.clone(),
+    });
+    
+    log::info!("Actors registered with EventBus");
 
     // Start HTTP server
     HttpServer::new(move || {

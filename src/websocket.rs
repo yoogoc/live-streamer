@@ -1,12 +1,12 @@
 use crate::event_bus::{EventBus, PublishEvent};
 use crate::events::*;
 use actix::prelude::*;
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 pub struct WebSocketManager {
-    connections: HashMap<Uuid, String>,
+    connections: HashMap<Uuid, (String, Addr<WebSocketSessionActor>)>,
     event_bus: Addr<EventBus>,
 }
 
@@ -18,8 +18,14 @@ impl WebSocketManager {
         }
     }
 
-    fn add_connection(&mut self, session_id: Uuid, user_id: String) {
-        self.connections.insert(session_id, user_id.clone());
+    fn add_connection(
+        &mut self,
+        session_id: Uuid,
+        user_id: String,
+        session_actor: Addr<WebSocketSessionActor>,
+    ) {
+        self.connections
+            .insert(session_id, (user_id.clone(), session_actor));
         info!(
             "Added WebSocket connection for session: {} user: {}",
             session_id, user_id
@@ -27,12 +33,64 @@ impl WebSocketManager {
     }
 
     fn remove_connection(&mut self, session_id: &Uuid) {
-        if let Some(user_id) = self.connections.remove(session_id) {
+        if let Some((user_id, _)) = self.connections.remove(session_id) {
             info!(
                 "Removed WebSocket connection for session: {} user: {}",
                 session_id, user_id
             );
         }
+    }
+}
+
+// New WebSocket Session Actor
+pub struct WebSocketSessionActor {
+    session: actix_ws::Session,
+    session_id: Uuid,
+    user_id: String,
+}
+
+impl WebSocketSessionActor {
+    pub fn new(session: actix_ws::Session, session_id: Uuid, user_id: String) -> Self {
+        Self {
+            session,
+            session_id,
+            user_id,
+        }
+    }
+}
+
+impl Actor for WebSocketSessionActor {
+    type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        info!(
+            "WebSocket session actor started for user: {} session: {}",
+            self.user_id, self.session_id
+        );
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SendMessage {
+    pub message: String,
+}
+
+impl Handler<SendMessage> for WebSocketSessionActor {
+    type Result = ();
+
+    fn handle(&mut self, msg: SendMessage, ctx: &mut Context<Self>) -> Self::Result {
+        let mut session = self.session.clone();
+        let message = msg.message;
+        let session_id = self.session_id;
+
+        // Use spawn to handle the async operation
+        let fut = async move {
+            if let Err(e) = session.text(message).await {
+                warn!("Failed to send message to session {}: {}", session_id, e);
+            }
+        };
+        ctx.spawn(fut.into_actor(self));
     }
 }
 
@@ -49,13 +107,14 @@ impl Actor for WebSocketManager {
 pub struct RegisterConnection {
     pub session_id: Uuid,
     pub user_id: String,
+    pub session_actor: Addr<WebSocketSessionActor>,
 }
 
 impl Handler<RegisterConnection> for WebSocketManager {
     type Result = ();
 
     fn handle(&mut self, msg: RegisterConnection, _ctx: &mut Context<Self>) -> Self::Result {
-        self.add_connection(msg.session_id, msg.user_id);
+        self.add_connection(msg.session_id, msg.user_id, msg.session_actor);
     }
 }
 
@@ -79,7 +138,7 @@ impl Handler<LLMResponseEvent> for WebSocketManager {
     fn handle(&mut self, event: LLMResponseEvent, _ctx: &mut Context<Self>) -> Self::Result {
         let session_id = event.metadata.session_id.unwrap_or_default();
 
-        if let Some(_user_id) = self.connections.get(&session_id) {
+        if let Some((user_id, session_actor)) = self.connections.get(&session_id) {
             let message = serde_json::json!({
                 "type": "llm_response",
                 "data": {
@@ -89,10 +148,18 @@ impl Handler<LLMResponseEvent> for WebSocketManager {
                 }
             });
 
+            let message_str = message.to_string();
             info!(
-                "Broadcasting LLM response to session {}: {}",
-                session_id, message
+                "Sending LLM response to session {} (user {}): {}",
+                session_id, user_id, message_str
             );
+
+            // Send the message through WebSocket session actor
+            session_actor.do_send(SendMessage {
+                message: message_str,
+            });
+        } else {
+            warn!("No active connection found for session {}", session_id);
         }
     }
 }
@@ -158,6 +225,7 @@ impl Handler<HandleTextMessage> for WebSocketManager {
 pub struct HandleUserConnect {
     pub session_id: Uuid,
     pub user_id: String,
+    pub session_actor: Addr<WebSocketSessionActor>,
 }
 
 impl Handler<HandleUserConnect> for WebSocketManager {
@@ -170,7 +238,7 @@ impl Handler<HandleUserConnect> for WebSocketManager {
         );
 
         // Register this connection
-        self.add_connection(msg.session_id, msg.user_id.clone());
+        self.add_connection(msg.session_id, msg.user_id.clone(), msg.session_actor);
 
         // Publish user connected event
         let event = UserConnectedEvent {
@@ -218,5 +286,71 @@ impl Handler<HandleUserDisconnect> for WebSocketManager {
         };
 
         self.event_bus.do_send(PublishEvent(event));
+    }
+}
+
+impl Handler<TTSResponseEvent> for WebSocketManager {
+    type Result = ();
+
+    fn handle(&mut self, event: TTSResponseEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        let session_id = event.metadata.session_id.unwrap_or_default();
+
+        if let Some((user_id, session_actor)) = self.connections.get(&session_id) {
+            let message = serde_json::json!({
+                "type": "tts_response",
+                "data": {
+                    "text": event.text,
+                    "voice": event.voice,
+                    "audio_data_length": event.audio_data.len(),
+                    "timestamp": event.metadata.timestamp
+                }
+            });
+
+            let message_str = message.to_string();
+            info!(
+                "Sending TTS response to session {} (user {}): {}",
+                session_id, user_id, message_str
+            );
+
+            // Send the message through WebSocket session actor
+            session_actor.do_send(SendMessage {
+                message: message_str,
+            });
+        } else {
+            warn!("No active connection found for session {}", session_id);
+        }
+    }
+}
+
+impl Handler<AnimationEvent> for WebSocketManager {
+    type Result = ();
+
+    fn handle(&mut self, event: AnimationEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        let session_id = event.metadata.session_id.unwrap_or_default();
+
+        if let Some((user_id, session_actor)) = self.connections.get(&session_id) {
+            let message = serde_json::json!({
+                "type": "animation",
+                "data": {
+                    "animation_type": event.animation_type,
+                    "duration": event.duration,
+                    "parameters": event.parameters,
+                    "timestamp": event.metadata.timestamp
+                }
+            });
+
+            let message_str = message.to_string();
+            info!(
+                "Sending animation event to session {} (user {}): {}",
+                session_id, user_id, message_str
+            );
+
+            // Send the message through WebSocket session actor
+            session_actor.do_send(SendMessage {
+                message: message_str,
+            });
+        } else {
+            warn!("No active connection found for session {}", session_id);
+        }
     }
 }

@@ -1,9 +1,9 @@
-use actix::prelude::*;
+use crate::event_bus::EventBus;
 use crate::events::*;
-use crate::event_bus::{EventBus, PublishEvent};
-use uuid::Uuid;
-use log::{info, error};
+use actix::prelude::*;
+use log::info;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct DigitalHumanActor {
@@ -47,14 +47,17 @@ impl DigitalHumanActor {
             conversation_history: Vec::new(),
             last_activity: chrono::Utc::now(),
         };
-        
+
         self.sessions.insert(session_id, session_data);
         info!("Created new session {} for user {}", session_id, user_id);
     }
 
     fn remove_session(&mut self, session_id: &Uuid) {
         if let Some(session) = self.sessions.remove(session_id) {
-            info!("Removed session {} for user {}", session_id, session.user_id);
+            info!(
+                "Removed session {} for user {}",
+                session_id, session.user_id
+            );
         }
     }
 
@@ -72,19 +75,25 @@ impl DigitalHumanActor {
 
     fn process_text_input(&mut self, event: TextInputEvent) {
         let session_id = event.metadata.session_id.unwrap_or_default();
-        
+
         // Add user message to history
         self.add_message_to_history(&session_id, "user".to_string(), event.text.clone());
 
-        info!("Processing text input for session {}: {}", session_id, event.text);
+        info!(
+            "Processing text input for session {}: {}",
+            session_id, event.text
+        );
 
         // Create a simple response
-        let response = format!("Hello! I'm {}, and I received your message: '{}'", self.name, event.text);
-        
+        let response = format!(
+            "Hello! I'm {}, and I received your message: '{}'",
+            self.name, event.text
+        );
+
         // Add AI response to history
         self.add_message_to_history(&session_id, "assistant".to_string(), response.clone());
 
-        // Publish LLM response event
+        // Create LLM response event
         let llm_response = LLMResponseEvent {
             metadata: EventMetadata {
                 session_id: Some(session_id),
@@ -96,7 +105,8 @@ impl DigitalHumanActor {
             tokens_used: None,
         };
 
-        self.event_bus.do_send(PublishEvent(llm_response));
+        // Publish LLM response event through EventBus
+        self.event_bus.do_send(llm_response);
     }
 }
 
@@ -104,7 +114,10 @@ impl Actor for DigitalHumanActor {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        info!("DigitalHumanActor '{}' started with ID: {}", self.name, self.id);
+        info!(
+            "DigitalHumanActor '{}' started with ID: {}",
+            self.name, self.id
+        );
     }
 }
 
@@ -112,7 +125,10 @@ impl Handler<UserConnectedEvent> for DigitalHumanActor {
     type Result = ();
 
     fn handle(&mut self, event: UserConnectedEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("User connected: {} in session {}", event.user_id, event.session_id);
+        info!(
+            "User connected: {} in session {}",
+            event.user_id, event.session_id
+        );
         self.create_session(event.session_id, event.user_id);
     }
 }
@@ -121,7 +137,10 @@ impl Handler<UserDisconnectedEvent> for DigitalHumanActor {
     type Result = ();
 
     fn handle(&mut self, event: UserDisconnectedEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("User disconnected: {} from session {}", event.user_id, event.session_id);
+        info!(
+            "User disconnected: {} from session {}",
+            event.user_id, event.session_id
+        );
         self.remove_session(&event.session_id);
     }
 }
@@ -138,10 +157,12 @@ impl Handler<AudioInputEvent> for DigitalHumanActor {
     type Result = ();
 
     fn handle(&mut self, event: AudioInputEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        info!("Received audio input of {} bytes for session {:?}", 
-              event.audio_data.len(), 
-              event.metadata.session_id);
-        
+        info!(
+            "Received audio input of {} bytes for session {:?}",
+            event.audio_data.len(),
+            event.metadata.session_id
+        );
+
         // TODO: Implement speech-to-text processing
         // This would convert audio to text and then trigger a TextInputEvent
     }
@@ -156,9 +177,11 @@ impl Handler<GetActorInfo> for DigitalHumanActor {
     type Result = String;
 
     fn handle(&mut self, _msg: GetActorInfo, _ctx: &mut Context<Self>) -> Self::Result {
-        format!("DigitalHuman: {} (ID: {}), Active sessions: {}", 
-                self.name, 
-                self.id, 
-                self.sessions.len())
+        format!(
+            "DigitalHuman: {} (ID: {}), Active sessions: {}",
+            self.name,
+            self.id,
+            self.sessions.len()
+        )
     }
 }

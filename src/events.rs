@@ -1,7 +1,9 @@
+use std::any::Any;
+
 use actix::prelude::*;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventMetadata {
@@ -22,7 +24,7 @@ impl Default for EventMetadata {
     }
 }
 
-pub trait Event: Message<Result = ()> + Clone + Send + 'static {
+pub trait Event: Message<Result = ()> + Clone + Send + Any + 'static {
     fn event_type(&self) -> &'static str;
     fn metadata(&self) -> &EventMetadata;
     fn set_metadata(&mut self, metadata: EventMetadata);
@@ -37,9 +39,15 @@ pub struct UserConnectedEvent {
 }
 
 impl Event for UserConnectedEvent {
-    fn event_type(&self) -> &'static str { "user_connected" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "user_connected"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -51,9 +59,15 @@ pub struct UserDisconnectedEvent {
 }
 
 impl Event for UserDisconnectedEvent {
-    fn event_type(&self) -> &'static str { "user_disconnected" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "user_disconnected"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -65,9 +79,15 @@ pub struct TextInputEvent {
 }
 
 impl Event for TextInputEvent {
-    fn event_type(&self) -> &'static str { "text_input" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "text_input"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -80,9 +100,15 @@ pub struct AudioInputEvent {
 }
 
 impl Event for AudioInputEvent {
-    fn event_type(&self) -> &'static str { "audio_input" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "audio_input"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -95,9 +121,15 @@ pub struct LLMResponseEvent {
 }
 
 impl Event for LLMResponseEvent {
-    fn event_type(&self) -> &'static str { "llm_response" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "llm_response"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -110,9 +142,15 @@ pub struct TTSResponseEvent {
 }
 
 impl Event for TTSResponseEvent {
-    fn event_type(&self) -> &'static str { "tts_response" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "tts_response"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }
 
 #[derive(Debug, Clone, Message, Serialize, Deserialize)]
@@ -125,7 +163,13 @@ pub struct AnimationEvent {
 }
 
 impl Event for AnimationEvent {
-    fn event_type(&self) -> &'static str { "animation" }
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn set_metadata(&mut self, metadata: EventMetadata) { self.metadata = metadata; }
+    fn event_type(&self) -> &'static str {
+        "animation"
+    }
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    fn set_metadata(&mut self, metadata: EventMetadata) {
+        self.metadata = metadata;
+    }
 }

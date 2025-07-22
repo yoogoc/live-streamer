@@ -1,6 +1,5 @@
-use crate::actor::*;
 use crate::websocket::*;
-use actix::Addr;
+use actix::prelude::*;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use actix_ws;
 use futures_util::StreamExt as _;
@@ -56,10 +55,14 @@ async fn handle_websocket_session(
     user_id: String,
     ws_manager: Addr<WebSocketManager>,
 ) {
+    // Create WebSocket session actor
+    let session_actor = WebSocketSessionActor::new(session.clone(), session_id, user_id.clone()).start();
+    
     // Send connection event
     ws_manager.do_send(HandleUserConnect {
         session_id,
         user_id: user_id.clone(),
+        session_actor: session_actor.clone(),
     });
 
     while let Some(msg) = stream.next().await {
@@ -72,12 +75,6 @@ async fn handle_websocket_session(
                     user_id: user_id.clone(),
                     text: text.to_string(),
                 });
-
-                // Echo back for now
-                if let Err(e) = session.text(format!("Echo: {}", text.to_string())).await {
-                    warn!("Failed to send echo: {}", e);
-                    break;
-                }
             }
             Ok(actix_ws::Message::Binary(bin)) => {
                 info!("Received binary data: {} bytes", bin.len());
