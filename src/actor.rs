@@ -100,16 +100,74 @@ impl DigitalHumanActor {
         let llm_response = LLMResponseEvent {
             metadata: EventMetadata {
                 session_id: Some(session_id),
-                user_id: event.metadata.user_id,
+                user_id: event.metadata.user_id.clone(),
                 ..Default::default()
             },
-            response,
+            response: response.clone(),
             model: "digital_human".to_string(),
             tokens_used: None,
         };
 
         // Publish LLM response event through EventBus
         self.event_bus.do_send(llm_response);
+
+        // Generate animation event based on response sentiment
+        let animation_event = self.generate_animation_for_response(&response, &session_id, &event.metadata.user_id);
+        self.event_bus.do_send(animation_event);
+
+        // Generate emotion event (could be facial expression)
+        let emotion_event = self.generate_emotion_for_response(&response, &session_id, &event.metadata.user_id);
+        self.event_bus.do_send(emotion_event);
+    }
+
+    fn generate_animation_for_response(&self, response: &str, session_id: &Uuid, user_id: &Option<String>) -> AnimationEvent {
+        // Simple animation selection based on content
+        let animation_type = if response.contains("Hello") || response.contains("Hi") {
+            "wave"
+        } else if response.contains("?") {
+            "thinking"
+        } else {
+            "talk"
+        };
+
+        AnimationEvent {
+            metadata: EventMetadata {
+                session_id: Some(*session_id),
+                user_id: user_id.clone(),
+                ..Default::default()
+            },
+            animation_type: animation_type.to_string(),
+            duration: Some(2.0),
+            parameters: serde_json::json!({
+                "intensity": 0.8,
+                "loop": false
+            }),
+        }
+    }
+
+    fn generate_emotion_for_response(&self, response: &str, session_id: &Uuid, user_id: &Option<String>) -> AnimationEvent {
+        // Generate facial expression based on response
+        let emotion = if response.contains("!") {
+            "excited"
+        } else if response.contains("?") {
+            "curious"
+        } else {
+            "friendly"
+        };
+
+        AnimationEvent {
+            metadata: EventMetadata {
+                session_id: Some(*session_id),
+                user_id: user_id.clone(),
+                ..Default::default()
+            },
+            animation_type: format!("expression_{}", emotion),
+            duration: Some(3.0),
+            parameters: serde_json::json!({
+                "emotion": emotion,
+                "strength": 0.7
+            }),
+        }
     }
 }
 

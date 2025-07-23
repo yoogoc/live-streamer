@@ -7,12 +7,15 @@ use eyre::Result;
 mod actor;
 mod event_bus;
 mod events;
+mod live_platform;
 mod llm;
 mod routes;
+mod validator;
 mod websocket;
 
 use actor::DigitalHumanActor;
 use event_bus::{EventBus, RegisterDigitalHuman, RegisterWebSocketManager};
+use live_platform::LiveStreamManager;
 use websocket::WebSocketManager;
 
 #[actix_web::main]
@@ -29,6 +32,10 @@ async fn main() -> Result<()> {
     // Create and start the WebSocket manager
     let ws_manager = WebSocketManager::new(event_bus.clone()).start();
     log::info!("WebSocketManager started");
+
+    // Create and start the LiveStream manager
+    let live_manager = LiveStreamManager::new(event_bus.clone()).start();
+    log::info!("LiveStreamManager started");
 
     // Create and start digital human actors
     let digital_human = DigitalHumanActor::new(
@@ -61,6 +68,7 @@ async fn main() -> Result<()> {
             .app_data(web::Data::new(ws_manager.clone()))
             .app_data(web::Data::new(event_bus.clone()))
             .app_data(web::Data::new(digital_human.clone()))
+            .app_data(web::Data::new(live_manager.clone()))
             .wrap(cors)
             .wrap(Logger::default())
             .configure(routes::configure_routes)

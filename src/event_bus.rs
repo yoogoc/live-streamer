@@ -1,5 +1,6 @@
 use crate::actor::DigitalHumanActor;
 use crate::events::*;
+use crate::validator::{TextValidator, ValidationResult};
 use crate::websocket::WebSocketManager;
 use actix::prelude::*;
 use log::info;
@@ -10,6 +11,7 @@ pub struct EventBus {
     // subscribers: HashMap<String, Vec<String>>,
     digital_human_actor: Option<Addr<DigitalHumanActor>>,
     websocket_manager: Option<Addr<WebSocketManager>>,
+    text_validator: TextValidator,
 }
 
 impl EventBus {
@@ -18,6 +20,7 @@ impl EventBus {
             // subscribers: HashMap::new(),
             digital_human_actor: None,
             websocket_manager: None,
+            text_validator: TextValidator::new(),
         }
     }
 
@@ -81,9 +84,36 @@ impl Handler<TextInputEvent> for EventBus {
             event.text, event.metadata.session_id
         );
 
-        // Forward to DigitalHumanActor
-        if let Some(ref digital_human) = self.digital_human_actor {
-            digital_human.do_send(event);
+        // 校验弹幕内容
+        match self.text_validator.validate(&event) {
+            ValidationResult::Allow => {
+                // 允许：转发给DigitalHumanActor
+                if let Some(ref digital_human) = self.digital_human_actor {
+                    digital_human.do_send(event);
+                }
+            }
+            ValidationResult::Ignore => {
+                // 忽略：什么都不做
+                info!("TextInputEvent ignored due to validation rules");
+            }
+            ValidationResult::Warn(warning_msg) => {
+                // 警告：使用LLM生成警告文本
+                let warning_response = LLMResponseEvent {
+                    metadata: EventMetadata {
+                        session_id: event.metadata.session_id,
+                        user_id: event.metadata.user_id,
+                        ..Default::default()
+                    },
+                    response: format!("⚠️ {}", warning_msg),
+                    model: "validation_system".to_string(),
+                    tokens_used: None,
+                };
+
+                // 发送警告消息
+                if let Some(ref websocket_manager) = self.websocket_manager {
+                    websocket_manager.do_send(warning_response);
+                }
+            }
         }
     }
 }
