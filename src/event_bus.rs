@@ -51,29 +51,27 @@ impl<T: Event> Handler<PublishEvent<T>> for EventBus {
     fn handle(&mut self, msg: PublishEvent<T>, ctx: &mut Context<Self>) -> Self::Result {
         let event = msg.0;
         let event_type = event.event_type();
+        let event = &event as &dyn Any;
 
         info!("Handling publish request for event: {}", event_type);
         match event_type {
             "user_connected" => {
-                if let Some(user_event) = (&event as &dyn Any).downcast_ref::<UserConnectedEvent>()
-                {
+                if let Some(user_event) = event.downcast_ref::<UserConnectedEvent>() {
                     ctx.address().do_send(user_event.clone());
                 }
             }
             "user_disconnected" => {
-                if let Some(user_event) =
-                    (&event as &dyn Any).downcast_ref::<UserDisconnectedEvent>()
-                {
+                if let Some(user_event) = event.downcast_ref::<UserDisconnectedEvent>() {
                     ctx.address().do_send(user_event.clone());
                 }
             }
             "text_input" => {
-                if let Some(text_event) = (&event as &dyn Any).downcast_ref::<TextInputEvent>() {
+                if let Some(text_event) = event.downcast_ref::<TextInputEvent>() {
                     ctx.address().do_send(text_event.clone());
                 }
             }
             "audio_input" => {
-                if let Some(audio_event) = (&event as &dyn Any).downcast_ref::<AudioInputEvent>() {
+                if let Some(audio_event) = event.downcast_ref::<AudioInputEvent>() {
                     // Forward to DigitalHumanActor if registered
                     if let Some(ref digital_human) = self.digital_human_actor {
                         digital_human.do_send(audio_event.clone());
@@ -81,12 +79,12 @@ impl<T: Event> Handler<PublishEvent<T>> for EventBus {
                 }
             }
             "llm_response" => {
-                if let Some(llm_event) = (&event as &dyn Any).downcast_ref::<LLMResponseEvent>() {
+                if let Some(llm_event) = event.downcast_ref::<LLMResponseEvent>() {
                     ctx.address().do_send(llm_event.clone());
                 }
             }
             "tts_response" => {
-                if let Some(tts_event) = (&event as &dyn Any).downcast_ref::<TTSResponseEvent>() {
+                if let Some(tts_event) = event.downcast_ref::<TTSResponseEvent>() {
                     // Forward to WebSocketManager if registered
                     if let Some(ref websocket_manager) = self.websocket_manager {
                         websocket_manager.do_send(tts_event.clone());
@@ -94,7 +92,7 @@ impl<T: Event> Handler<PublishEvent<T>> for EventBus {
                 }
             }
             "animation" => {
-                if let Some(anim_event) = (&event as &dyn Any).downcast_ref::<AnimationEvent>() {
+                if let Some(anim_event) = event.downcast_ref::<AnimationEvent>() {
                     // Forward to WebSocketManager if registered
                     if let Some(ref websocket_manager) = self.websocket_manager {
                         websocket_manager.do_send(anim_event.clone());

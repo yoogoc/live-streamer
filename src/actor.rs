@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub struct DigitalHumanActor {
     pub id: Uuid,
     pub name: String,
+    #[allow(unused)]
     pub personality: String,
     pub sessions: HashMap<Uuid, SessionData>,
     pub event_bus: Addr<EventBus>,
@@ -16,6 +17,7 @@ pub struct DigitalHumanActor {
 
 #[derive(Debug, Clone)]
 pub struct SessionData {
+    #[allow(unused)]
     pub session_id: Uuid,
     pub user_id: String,
     pub conversation_history: Vec<ConversationMessage>,
@@ -23,6 +25,7 @@ pub struct SessionData {
 }
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct ConversationMessage {
     pub role: String, // "user" or "assistant"
     pub content: String,

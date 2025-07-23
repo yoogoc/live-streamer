@@ -26,7 +26,9 @@ impl Default for EventMetadata {
 
 pub trait Event: Message<Result = ()> + Clone + Send + Any + 'static {
     fn event_type(&self) -> &'static str;
+    #[allow(unused)]
     fn metadata(&self) -> &EventMetadata;
+    #[allow(unused)]
     fn set_metadata(&mut self, metadata: EventMetadata);
 }
 
