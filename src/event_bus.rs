@@ -3,7 +3,6 @@ use crate::events::*;
 use crate::websocket::WebSocketManager;
 use actix::prelude::*;
 use log::info;
-use std::any::Any;
 // use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -38,71 +37,6 @@ impl Actor for EventBus {
 
     fn started(&mut self, _ctx: &mut Self::Context) {
         info!("EventBus started");
-    }
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct PublishEvent<T: Event>(pub T);
-
-impl<T: Event> Handler<PublishEvent<T>> for EventBus {
-    type Result = ();
-
-    fn handle(&mut self, msg: PublishEvent<T>, ctx: &mut Context<Self>) -> Self::Result {
-        let event = msg.0;
-        let event_type = event.event_type();
-        let event = &event as &dyn Any;
-
-        info!("Handling publish request for event: {}", event_type);
-        match event_type {
-            "user_connected" => {
-                if let Some(user_event) = event.downcast_ref::<UserConnectedEvent>() {
-                    ctx.address().do_send(user_event.clone());
-                }
-            }
-            "user_disconnected" => {
-                if let Some(user_event) = event.downcast_ref::<UserDisconnectedEvent>() {
-                    ctx.address().do_send(user_event.clone());
-                }
-            }
-            "text_input" => {
-                if let Some(text_event) = event.downcast_ref::<TextInputEvent>() {
-                    ctx.address().do_send(text_event.clone());
-                }
-            }
-            "audio_input" => {
-                if let Some(audio_event) = event.downcast_ref::<AudioInputEvent>() {
-                    // Forward to DigitalHumanActor if registered
-                    if let Some(ref digital_human) = self.digital_human_actor {
-                        digital_human.do_send(audio_event.clone());
-                    }
-                }
-            }
-            "llm_response" => {
-                if let Some(llm_event) = event.downcast_ref::<LLMResponseEvent>() {
-                    ctx.address().do_send(llm_event.clone());
-                }
-            }
-            "tts_response" => {
-                if let Some(tts_event) = event.downcast_ref::<TTSResponseEvent>() {
-                    // Forward to WebSocketManager if registered
-                    if let Some(ref websocket_manager) = self.websocket_manager {
-                        websocket_manager.do_send(tts_event.clone());
-                    }
-                }
-            }
-            "animation" => {
-                if let Some(anim_event) = event.downcast_ref::<AnimationEvent>() {
-                    // Forward to WebSocketManager if registered
-                    if let Some(ref websocket_manager) = self.websocket_manager {
-                        websocket_manager.do_send(anim_event.clone());
-                    }
-                }
-            }
-            _ => {
-                info!("Unknown event type: {}", event_type);
-            }
-        }
     }
 }
 
@@ -150,6 +84,54 @@ impl Handler<TextInputEvent> for EventBus {
         // Forward to DigitalHumanActor
         if let Some(ref digital_human) = self.digital_human_actor {
             digital_human.do_send(event);
+        }
+    }
+}
+
+impl Handler<AudioInputEvent> for EventBus {
+    type Result = ();
+
+    fn handle(&mut self, event: AudioInputEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        info!(
+            "EventBus received AudioInputEvent: {} for session {:?}",
+            event.format, event.metadata.session_id
+        );
+
+        // Forward to DigitalHumanActor
+        if let Some(ref digital_human) = self.digital_human_actor {
+            digital_human.do_send(event);
+        }
+    }
+}
+
+impl Handler<TTSResponseEvent> for EventBus {
+    type Result = ();
+
+    fn handle(&mut self, event: TTSResponseEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        info!(
+            "EventBus received TTSResponseEvent: {} for session {:?}",
+            event.text, event.metadata.session_id
+        );
+
+        // Forward to WebSocketManager to send back to client
+        if let Some(ref websocket_manager) = self.websocket_manager {
+            websocket_manager.do_send(event);
+        }
+    }
+}
+
+impl Handler<AnimationEvent> for EventBus {
+    type Result = ();
+
+    fn handle(&mut self, event: AnimationEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        info!(
+            "EventBus received AnimationEvent: {} for session {:?}",
+            event.animation_type, event.metadata.session_id
+        );
+
+        // Forward to WebSocketManager to send back to client
+        if let Some(ref websocket_manager) = self.websocket_manager {
+            websocket_manager.do_send(event);
         }
     }
 }

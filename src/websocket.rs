@@ -1,4 +1,4 @@
-use crate::event_bus::{EventBus, PublishEvent};
+use crate::event_bus::EventBus;
 use crate::events::*;
 use actix::prelude::*;
 use log::{info, warn};
@@ -196,7 +196,7 @@ impl Handler<HandleTextMessage> for WebSocketManager {
                                     .and_then(|l| l.as_str())
                                     .map(|s| s.to_string()),
                             };
-                            self.event_bus.do_send(PublishEvent(event));
+                            self.event_bus.do_send(event);
                         }
                     }
                     _ => {
@@ -215,7 +215,7 @@ impl Handler<HandleTextMessage> for WebSocketManager {
                 text: msg.text.to_string(),
                 language: None,
             };
-            self.event_bus.do_send(PublishEvent(event));
+            self.event_bus.do_send(event);
         }
     }
 }
@@ -251,7 +251,7 @@ impl Handler<HandleUserConnect> for WebSocketManager {
             user_id: msg.user_id,
         };
 
-        self.event_bus.do_send(PublishEvent(event));
+        self.event_bus.do_send(event);
     }
 }
 
@@ -285,7 +285,7 @@ impl Handler<HandleUserDisconnect> for WebSocketManager {
             user_id: msg.user_id,
         };
 
-        self.event_bus.do_send(PublishEvent(event));
+        self.event_bus.do_send(event);
     }
 }
 
