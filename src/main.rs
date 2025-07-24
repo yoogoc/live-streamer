@@ -7,16 +7,17 @@ use eyre::Result;
 mod actor;
 mod event_bus;
 mod events;
-mod live_platform;
 mod llm;
+mod platform;
 mod routes;
 mod validator;
 mod websocket;
 
 use actor::DigitalHumanActor;
 use event_bus::{EventBus, RegisterDigitalHuman, RegisterWebSocketManager};
-use live_platform::LiveStreamManager;
 use websocket::WebSocketManager;
+
+use platform::LiveStreamManager;
 
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -49,11 +50,11 @@ async fn main() -> Result<()> {
     event_bus.do_send(RegisterDigitalHuman {
         addr: digital_human.clone(),
     });
-    
+
     event_bus.do_send(RegisterWebSocketManager {
         addr: ws_manager.clone(),
     });
-    
+
     log::info!("Actors registered with EventBus");
 
     // Start HTTP server

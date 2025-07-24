@@ -1,4 +1,4 @@
-use crate::live_platform::*;
+use crate::platform::*;
 use crate::websocket::*;
 use actix::prelude::*;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
@@ -60,8 +60,9 @@ async fn handle_websocket_session(
     ws_manager: Addr<WebSocketManager>,
 ) {
     // Create WebSocket session actor
-    let session_actor = WebSocketSessionActor::new(session.clone(), session_id, user_id.clone()).start();
-    
+    let session_actor =
+        WebSocketSessionActor::new(session.clone(), session_id, user_id.clone()).start();
+
     // Send connection event
     ws_manager.do_send(HandleUserConnect {
         session_id,
@@ -139,7 +140,7 @@ async fn handle_douyin_danmaku(
     live_manager: web::Data<Addr<LiveStreamManager>>,
 ) -> Result<HttpResponse> {
     info!("Received Douyin danmaku: {:?}", json);
-    
+
     // 解析抖音弹幕数据
     if let Ok(danmaku) = parse_douyin_danmaku(&json) {
         live_manager.do_send(ProcessDanmaku { danmaku });
@@ -155,7 +156,7 @@ async fn handle_bilibili_danmaku(
     live_manager: web::Data<Addr<LiveStreamManager>>,
 ) -> Result<HttpResponse> {
     info!("Received Bilibili danmaku: {:?}", json);
-    
+
     // 解析B站弹幕数据
     if let Ok(danmaku) = parse_bilibili_danmaku(&json) {
         live_manager.do_send(ProcessDanmaku { danmaku });
@@ -171,28 +172,32 @@ async fn add_platform_config(
     live_manager: web::Data<Addr<LiveStreamManager>>,
 ) -> Result<HttpResponse> {
     info!("Adding platform config: {:?}", json);
-    
+
     live_manager.do_send(AddPlatformConfig {
         config: json.into_inner(),
     });
-    
+
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": "success"})))
 }
 
 fn parse_douyin_danmaku(data: &serde_json::Value) -> Result<DanmakuMessage, String> {
-    let message = data.get("message")
+    let message = data
+        .get("message")
         .and_then(|m| m.as_str())
         .ok_or("Missing message field")?;
-    
-    let user_id = data.get("user_id")
+
+    let user_id = data
+        .get("user_id")
         .and_then(|u| u.as_str())
         .unwrap_or("anonymous");
-    
-    let username = data.get("username")
+
+    let username = data
+        .get("username")
         .and_then(|u| u.as_str())
         .unwrap_or("用户");
 
-    let room_id = data.get("room_id")
+    let room_id = data
+        .get("room_id")
         .and_then(|r| r.as_str())
         .unwrap_or("unknown");
 
@@ -203,34 +208,43 @@ fn parse_douyin_danmaku(data: &serde_json::Value) -> Result<DanmakuMessage, Stri
         username: username.to_string(),
         message: message.to_string(),
         timestamp: chrono::Utc::now(),
-        user_level: data.get("user_level").and_then(|l| l.as_u64()).map(|l| l as u32),
-        is_vip: data.get("is_vip").and_then(|v| v.as_bool()).unwrap_or(false),
+        user_level: data
+            .get("user_level")
+            .and_then(|l| l.as_u64())
+            .map(|l| l as u32),
+        is_vip: data
+            .get("is_vip")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
     })
 }
 
 fn parse_bilibili_danmaku(data: &serde_json::Value) -> Result<DanmakuMessage, String> {
-    let info = data.get("info")
+    let info = data
+        .get("info")
         .and_then(|i| i.as_array())
         .ok_or("Missing info array")?;
-    
-    let message = info.get(1)
+
+    let message = info
+        .get(1)
         .and_then(|m| m.as_str())
         .ok_or("Missing message")?;
-    
-    let user_info = info.get(2)
+
+    let user_info = info
+        .get(2)
         .and_then(|u| u.as_array())
         .ok_or("Missing user info")?;
-    
-    let user_id = user_info.get(0)
+
+    let user_id = user_info
+        .get(0)
         .and_then(|u| u.as_u64())
         .map(|u| u.to_string())
         .unwrap_or("anonymous".to_string());
-    
-    let username = user_info.get(1)
-        .and_then(|u| u.as_str())
-        .unwrap_or("用户");
 
-    let room_id = data.get("roomid")
+    let username = user_info.get(1).and_then(|u| u.as_str()).unwrap_or("用户");
+
+    let room_id = data
+        .get("roomid")
         .and_then(|r| r.as_u64())
         .map(|r| r.to_string())
         .unwrap_or("unknown".to_string());
