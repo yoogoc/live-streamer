@@ -166,7 +166,7 @@ impl TextValidator {
 
         // 检查冷却时间
         let time_since_last = now.signed_duration_since(user_stats.last_message_time);
-        if time_since_last.num_seconds() < cooldown_seconds as i64 {
+        if time_since_last.num_seconds() >0 && time_since_last.num_seconds() < cooldown_seconds as i64 {
             return ValidationResult::Ignore;
         }
 

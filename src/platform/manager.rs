@@ -34,6 +34,8 @@ impl LiveStreamManager {
         if config.enabled {
             self.start_listener(&config_id, &config);
         }
+        // 当前只支持一个平台
+        self.configs.clear();
 
         self.configs.insert(config_id, config);
     }

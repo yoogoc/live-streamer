@@ -11,7 +11,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
             .route("/health", web::get().to(health_check))
-            .route("/ws/{user_id}", web::get().to(websocket_handler))
+            .route(
+                "/ws/{channel_id}/{user_id}",
+                web::get().to(websocket_handler),
+            )
             .route("/digital-human/info", web::get().to(get_digital_human_info))
             .route("/danmaku/douyin", web::post().to(handle_douyin_danmaku))
             .route("/danmaku/bilibili", web::post().to(handle_bilibili_danmaku))
@@ -29,11 +32,11 @@ async fn health_check() -> Result<HttpResponse> {
 
 async fn websocket_handler(
     req: HttpRequest,
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     stream: web::Payload,
     ws_manager: web::Data<Addr<WebSocketManager>>,
 ) -> Result<HttpResponse> {
-    let user_id = path.into_inner();
+    let (_channel_id, user_id) = path.into_inner();
     info!("WebSocket connection request from user: {}", user_id);
 
     let (response, session, stream) = actix_ws::handle(&req, stream)?;
