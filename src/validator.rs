@@ -155,6 +155,9 @@ impl TextValidator {
             .unwrap_or(3);
 
         let now = Utc::now();
+        
+        // 检查用户是否存在，如果不存在则创建新用户（第一条消息总是允许的）
+        let is_new_user = !self.user_stats.contains_key(user_id);
         let user_stats = self
             .user_stats
             .entry(user_id.to_string())
@@ -164,13 +167,16 @@ impl TextValidator {
                 warning_count: 0,
             });
 
-        // 检查冷却时间
-        let time_since_last = now.signed_duration_since(user_stats.last_message_time);
-        if time_since_last.num_seconds() >0 && time_since_last.num_seconds() < cooldown_seconds as i64 {
-            return ValidationResult::Ignore;
+        // 如果不是新用户，检查冷却时间
+        if !is_new_user {
+            let time_since_last = now.signed_duration_since(user_stats.last_message_time);
+            if time_since_last.num_seconds() < cooldown_seconds as i64 {
+                return ValidationResult::Ignore;
+            }
         }
 
         // 检查每分钟消息数量
+        let time_since_last = now.signed_duration_since(user_stats.last_message_time);
         if time_since_last.num_seconds() < 60 {
             user_stats.message_count += 1;
             if user_stats.message_count > max_messages {
